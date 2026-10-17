@@ -1,4 +1,10 @@
-# MapleDesk design concept
+# MapleDesk design concepts
+
+## Interactive prototype
+
+[Download MapleDesk-Interactive.html](MapleDesk-Interactive.html) using GitHub’s **Download raw file** button, then open it in your browser. This is a self-contained clickable prototype with mock WhatsApp and email, leads, reminders, change-request tasks, and subscription settings. See the [project README](../README.md) for walkthroughs and local-server instructions.
+
+## Original dashboard image
 
 A proposed subscription workspace for Canadian insurance brokers, covering lead follow-ups, personalized WhatsApp drafts, policy date reminders, and client change requests.
 

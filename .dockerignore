@@ -1,0 +1,11 @@
+.git
+node_modules
+data
+.env
+.env.*
+*.enc
+infra/.terraform
+infra/*.tfstate*
+infra/*.tfvars
+playwright-report
+test-results

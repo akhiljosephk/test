@@ -2,14 +2,14 @@ const { chromium } = require('playwright');
 const {spawn}=require('node:child_process');
 const path=require('node:path');
 const fs=require('node:fs');
-const server=spawn(process.execPath,[path.join(__dirname,'..','server.js')],{env:{...process.env,PORT:'3100'},stdio:'ignore'});
+const server=spawn(process.execPath,[path.join(__dirname,'..','server.js')],{env:{...process.env,PORT:'3100',DB_PATH:require('node:path').join(require('node:os').tmpdir(),'mapledesk-prototype-'+process.pid+'.sqlite'),MESSAGING_MODE:'mock'},stdio:'ignore'});
 process.on('exit',()=>server.kill());
 const assert = require('node:assert/strict');
 (async()=>{
 const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),headless:true,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1512,height:1100}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:3100/');
+await page.goto('http://127.0.0.1:3100/demo');
 await page.evaluate(()=>localStorage.clear());await page.reload();
 const nav=async p=>{await page.locator(`#nav [data-page="${p}"]`).click();};
 const action=async a=>{await page.locator(`[data-action="${a}"]`).first().click();};

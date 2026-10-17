@@ -1,0 +1,63 @@
+"use strict";
+const Database = require("better-sqlite3");
+const fs = require("node:fs");
+const path = require("node:path");
+const crypto = require("node:crypto");
+const id = () => crypto.randomUUID();
+function openDb(filename) {
+  if (filename !== ":memory:") {
+    fs.mkdirSync(path.dirname(filename), { recursive: true, mode: 0o700 });
+  }
+  const db = new Database(filename);
+  if (filename !== ":memory:") fs.chmodSync(filename, 0o600);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+  db.pragma("busy_timeout = 5000");
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version(version INTEGER PRIMARY KEY);
+    INSERT OR IGNORE INTO schema_version VALUES(1);
+    CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,password_hash TEXT NOT NULL,last_totp INTEGER NOT NULL DEFAULT -1);
+    CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),csrf TEXT NOT NULL,expires_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS login_limits(key TEXT PRIMARY KEY,count INTEGER NOT NULL,expires_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS contacts(id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT UNIQUE,phone TEXT UNIQUE,notes TEXT NOT NULL DEFAULT '',email_consent INTEGER NOT NULL DEFAULT 0,whatsapp_consent INTEGER NOT NULL DEFAULT 0,opted_out INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS consent_events(id TEXT PRIMARY KEY,contact_id TEXT NOT NULL REFERENCES contacts(id),channel TEXT NOT NULL,granted INTEGER NOT NULL,source TEXT NOT NULL,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS leads(id TEXT PRIMARY KEY,contact_id TEXT NOT NULL UNIQUE REFERENCES contacts(id),insurance_type TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'New enquiry',due TEXT NOT NULL,interval_days INTEGER NOT NULL CHECK(interval_days IN (2,4)),channel TEXT NOT NULL CHECK(channel IN ('email','whatsapp')));
+    CREATE TABLE IF NOT EXISTS policies(id TEXT PRIMARY KEY,contact_id TEXT NOT NULL REFERENCES contacts(id),number TEXT NOT NULL UNIQUE,insurer TEXT NOT NULL,insurance_type TEXT NOT NULL,effective TEXT NOT NULL,expiry TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Active',verified_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS threads(id TEXT PRIMARY KEY,contact_id TEXT NOT NULL REFERENCES contacts(id),channel TEXT NOT NULL,external_id TEXT,subject TEXT NOT NULL DEFAULT '',last_inbound TEXT,UNIQUE(contact_id,channel));
+    CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL REFERENCES threads(id),direction TEXT NOT NULL,text TEXT NOT NULL,status TEXT NOT NULL,provider_id TEXT UNIQUE,rfc_id TEXT,created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,contact_id TEXT NOT NULL REFERENCES contacts(id),channel TEXT NOT NULL,kind TEXT NOT NULL,detail TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'Open',note TEXT NOT NULL DEFAULT '',source_message TEXT UNIQUE REFERENCES messages(id),ack_message_id TEXT REFERENCES messages(id),created_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,dedupe_key TEXT UNIQUE NOT NULL,type TEXT NOT NULL,payload TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',attempts INTEGER NOT NULL DEFAULT 0,available_at TEXT NOT NULL,lease_until TEXT,last_error TEXT,created_at TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS jobs_due ON jobs(status,available_at);
+    CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);
+    INSERT OR IGNORE INTO settings VALUES('autoAck','false'),('reminders','true');
+    CREATE TABLE IF NOT EXISTS integrations(name TEXT PRIMARY KEY,secret TEXT NOT NULL,metadata TEXT NOT NULL DEFAULT '{}',updated_at TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS oauth_states(hash TEXT PRIMARY KEY,session_hash TEXT NOT NULL,verifier TEXT NOT NULL,expires_at INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS inbound_events(provider TEXT NOT NULL,event_id TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(provider,event_id));
+    CREATE TABLE IF NOT EXISTS audit(id TEXT PRIMARY KEY,event TEXT NOT NULL,entity_id TEXT,created_at TEXT NOT NULL);
+  `);
+  if (
+    db.prepare("SELECT max(version) version FROM schema_version").get()
+      .version !== 1
+  )
+    throw new Error("Unsupported database schema version");
+  return db;
+}
+const audit = (db, event, entity = null, at = new Date().toISOString()) =>
+  db.prepare("INSERT INTO audit VALUES(?,?,?,?)").run(id(), event, entity, at);
+const setting = (db, key) =>
+  JSON.parse(
+    db.prepare("SELECT value FROM settings WHERE key=?").get(key)?.value ||
+      "false",
+  );
+function enqueue(db, key, type, payload, at) {
+  const jobId = id();
+  const result = db
+    .prepare(
+      "INSERT OR IGNORE INTO jobs(id,dedupe_key,type,payload,available_at,created_at) VALUES(?,?,?,?,?,?)",
+    )
+    .run(jobId, key, type, JSON.stringify(payload), at, at);
+  return result.changes
+    ? jobId
+    : db.prepare("SELECT id FROM jobs WHERE dedupe_key=?").get(key).id;
+}
+module.exports = { openDb, id, audit, setting, enqueue };

@@ -1,0 +1,253 @@
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.login-intro {
+  padding: 12vh 10%;
+  background: #163e32;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.login-intro .brand {
+  padding: 0;
+  color: #fff;
+}
+.login-intro h1 {
+  font-size: 44px;
+  max-width: 440px;
+  margin-top: 55px;
+  line-height: 1.25;
+}
+.login-intro p {
+  color: #bbd0bd;
+  max-width: 400px;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 50px 18%;
+  background: #fafbf8;
+}
+.login-form h1 {
+  font-size: 28px;
+}
+.login-form form {
+  margin-top: 30px;
+}
+.login-form .button {
+  width: 100%;
+  padding: 13px;
+}
+.login-form .hint {
+  margin-top: 20px;
+}
+.form-error {
+  color: #a54f40;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.workspace-empty {
+  text-align: center;
+  padding: 55px 25px;
+}
+.workspace-empty h2 {
+  margin-bottom: 10px;
+}
+.workspace-empty p {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 23px;
+}
+.body-copy {
+  font-size: 12px;
+  color: #6d8075;
+  line-height: 1.9;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+.checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  color: #617366;
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.checkbox-field input {
+  margin-top: 4px;
+}
+.badge-live {
+  background: #fff3e3;
+  border-color: #f4d6ad;
+  color: #99753a;
+}
+.inline-error {
+  padding: 10px;
+  background: #fff2ec;
+  border-radius: 5px;
+  color: #ab6145;
+  font-size: 11px;
+  margin: 12px 0;
+}
+.status-line {
+  font-size: 10px;
+  color: #899a8c;
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.section-space {
+  margin-top: 22px;
+}
+.job-error {
+  max-width: 350px;
+  white-space: normal;
+  line-height: 1.7;
+}
+.full-width {
+  width: 100%;
+}
+.send-note {
+  padding: 12px;
+  background: #f6f8ef;
+  font-size: 11px;
+  color: #85966e;
+  line-height: 1.8;
+  border-radius: 6px;
+  margin: 15px 0;
+}
+.check-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+}
+.message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.consent-status {
+  font-size: 10px;
+  color: #8b967d;
+  line-height: 1.8;
+}
+.body-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.detail-list {
+  line-height: 2.2;
+  font-size: 12px;
+  color: #687f6d;
+}
+.small-title {
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: #9aaa98;
+  text-transform: uppercase;
+  margin-bottom: 15px;
+}
+.busy {
+  opacity: 0.7;
+}
+.login-form .brand {
+  display: none;
+}
+.app footer a {
+  color: var(--green);
+}
+dialog h2 {
+  padding-right: 10px;
+}
+.messages .bubble .status-line {
+  border-top: 1px solid #e1eadb;
+  padding-top: 7px;
+  margin-top: 7px;
+}
+#global-error {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #fff0e4;
+  color: #9e633f;
+  z-index: 101;
+  padding: 8px 18px;
+  font-size: 12px;
+  text-align: center;
+}
+.csv-preview {
+  max-height: 230px;
+  overflow: auto;
+  font-size: 12px;
+  padding: 15px;
+  background: #f6f8f1;
+  line-height: 1.8;
+}
+.mode-note {
+  margin-bottom: 20px;
+  background: #f3f6ec;
+  padding: 12px 16px;
+  border-radius: 5px;
+  color: #839474;
+  font-size: 11px;
+}
+.search-month {
+  flex: 0 1 170px;
+  min-width: 140px;
+}
+.sidebar-bottom .profile {
+  cursor: default;
+}
+.workspace-empty .actions {
+  justify-content: center;
+}
+@media (max-width: 760px) {
+  .login-screen {
+    grid-template-columns: 1fr;
+  }
+  .login-intro {
+    display: none;
+  }
+  .login-form {
+    min-height: 100vh;
+    padding: 35px 25px;
+  }
+  .login-form .brand {
+    display: flex;
+    margin-bottom: 40px;
+    padding: 0;
+  }
+  .body-columns {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .topbar .breadcrumb {
+    font-size: 10px;
+  }
+  .demo-pill {
+    font-size: 9px;
+  }
+  .page-head {
+    flex-wrap: wrap;
+  }
+  .chat-head .actions {
+    max-width: 170px;
+  }
+  .top-actions {
+    gap: 5px;
+  }
+  .sidebar {
+    width: 230px;
+  }
+}

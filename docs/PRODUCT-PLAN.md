@@ -1,5 +1,7 @@
 # MapleDesk: workflows, architecture, stack, and budget
 
+> Historical multi-business proposal. The current client-first scope and lower-cost deployment are in [SINGLE-BROKER-LAUNCH.md](SINGLE-BROKER-LAUNCH.md).
+
 Planning proposal · October 17, 2026 · All estimates in Canadian dollars, before tax.
 
 These are scope-based engineering estimates, not vendor quotes. Current provider prices and access/verification requirements must be confirmed before a fixed-price contract. The existing prototype demonstrates interactions; production authentication, integration, automation, billing, and security still need implementation.

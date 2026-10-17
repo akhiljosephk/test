@@ -1,0 +1,8 @@
+[Unit]
+Description=MapleDesk encrypted S3 backup
+After=docker.service
+[Service]
+Type=oneshot
+TimeoutStartSec=900
+WorkingDirectory=/opt/mapledesk
+ExecStart=/usr/bin/docker compose exec -T app node scripts/backup.js

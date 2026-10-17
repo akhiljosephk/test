@@ -1,40 +1,50 @@
-# MapleDesk · Interactive design prototype
+# MapleDesk · Single-broker workspace
 
-A clickable subscription workspace for Canadian insurance brokers. All clients, policies, conversations, acknowledgements, and billing are simulated. No messages are sent and no insurer accounts are accessed.
+A client-first insurance workspace for a broker using Gmail and WhatsApp Business. It keeps client names unchanged and organizes follow-ups, policies, conversations and change tasks in one place.
 
-## Try it
+**Status:** implemented and locally tested; no real accounts connected and no AWS resources deployed. Provider acceptance tests, phone-app coexistence validation and an AWS recovery rehearsal are still required before production use.
 
-For a **single-file demo**, open [`mockups/MapleDesk-Interactive.html`](mockups/MapleDesk-Interactive.html) on GitHub and choose **Download raw file**. Open the downloaded HTML in a browser. It includes all app code, styles, and sample data; no network connection is needed. Direct local-file opening may be restricted by managed browser policies; in that case use the local server below.
+## Start here
 
-Or download this branch with **Code → Download ZIP**, unzip it, and open `index.html` in your browser. No installation or accounts are required. Keep `app.js` and `styles.css` beside `index.html`.
+- [Current scope, architecture and estimated operating costs](docs/SINGLE-BROKER-LAUNCH.md)
+- [Account setup: test locally before buying cloud infrastructure](docs/ACCOUNT-SETUP.md)
+- [Development, deployment, backups and recovery](docs/DEPLOYMENT.md)
+- [Validation evidence and remaining launch gates](docs/VALIDATION.md)
+- [Original interactive visual prototype](mockups/MapleDesk-Interactive.html)
 
-Alternatively, with Node.js 18 or newer:
+## What it does
+
+- Private owner sign-in, secure server sessions, authenticator MFA in production, and login throttling.
+- Server-backed contacts, consent evidence, opt-outs, client notes, lead statuses, monthly filters and 2/4-day follow-up dates.
+- Gmail OAuth, recent inbox/sent synchronization, incremental polling, conversation replies and queued sending adapters.
+- Official WhatsApp API webhook verification, inbound messages/statuses, approved templates and service-window checks.
+- A **manual WhatsApp alternative**: open a draft in the existing phone app and explicitly confirm sending. It does not claim automatic delivery or synchronize app history.
+- Policy entry/updates, CSV preview/import, daily 30/7-day reminder drafts and broker approval.
+- Rule-detected client change requests, optional receipt-only acknowledgements, manual task creation and internal review notes.
+- Durable jobs, duplicate protection, stale-policy checks, audit activity, encrypted credential storage and encrypted backup/restore tooling.
+
+The pilot uses Node.js 24, Express and SQLite on one server. It has no subscription billing, AI fees, insurer portal automation or multi-business hosting. Scaling to other businesses needs a reviewed data/access migration.
+
+## Local setup
 
 ```sh
+npm ci
+# Provision the owner with a password entered privately; see the runbook:
+read -r -p 'Owner email: ' OWNER_EMAIL
+read -r -s -p 'Initial owner password (14+ characters): ' OWNER_PASSWORD
+export OWNER_EMAIL OWNER_PASSWORD
+npm run setup:local
+unset OWNER_EMAIL OWNER_PASSWORD
 npm start
 ```
 
-Open the server on port 3000. There are no runtime npm dependencies or build step; Playwright is a development-only test dependency. Optional Google Fonts improve typography; system fonts work offline. Use a local server if your browser restricts storage for local files.
+The workspace is at `/`; the original demo is at `/demo`. The setup command creates an empty database and a private `.env`; no default owner or sample clients are created. Messaging defaults to mock delivery. Keep `.env`, databases, backups and Terraform state out of Git.
 
-## Click through the workflows
+```sh
+npm run check
+npm test
+```
 
-- **Dashboard:** choose a client, switch between WhatsApp and email drafts, edit the message, and confirm a mock send. The next follow-up moves forward by the lead’s 2- or 4-day cadence.
-- **Leads & follow-ups:** search or filter leads; add a lead, edit notes and contact details, schedule a date (including another month), or close a lead as won/lost. Closed leads stop appearing in the follow-up queue.
-- **Unified inbox:** switch between WhatsApp and email, read conversation history, and send simulated replies. Use **Simulate incoming** for a general enquiry or a DOB, address, phone, or policy date change.
-- **Change requests:** incoming change requests create tasks and, when enabled, a personalized acknowledgement on the same channel. Review the request, add internal notes, and update its status. This never changes an insurer’s policy.
-- **Policies & reminders:** review 30-day and 7-day reminders for effective/expiry dates, edit the text, choose WhatsApp or email, and send to the mock inbox.
-- **Integrations & settings:** toggle mock channel connections and acknowledgement/reminder workflows. Disconnecting a channel blocks simulated sends and incoming messages on that channel.
-- **Subscription:** switch illustrative CAD plans without checkout or payment. Plan choices do not enforce feature limits in this design prototype.
-- **Activity:** inspect a record of actions taken in the demo.
+Browser tests need Chromium: `npx playwright install chromium`, or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to an existing binary. Tests use temporary databases and synthetic provider responses. For container checks, build `mapledesk:pilot` and run `npm run test:container`. No tests require real client accounts.
 
-Changes persist in this browser’s local storage. The top-bar reset button restores sample data. The demo date is fixed at **October 20, 2026** so reminders remain predictable. Use sample information only: this prototype has no authentication or production data security. There is no background scheduler; actions run when clicked.
-
-## Original visual concepts
-
-The PNG, PDF, and standalone HTML image concept are in [`mockups/`](mockups/).
-
-## Development checks
-
-Run `npm run check` for JavaScript syntax checks and `npm run export` to refresh the self-contained HTML after changes.
-
-For browser workflow checks, run `npm ci`, then `npx playwright install chromium` if Chromium is not installed, then `npm test`. Tests start a separate server on port 3100 and use a fresh browser profile. You can set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to an existing Chromium binary. Tests cover follow-ups, lead updates, both messaging channels, acknowledgements, task completion, reminders, disconnected-channel blocking, persistence, reset, responsive navigation, and the single-file export.
+The self-contained visual mockup in `mockups/` still works offline: use GitHub's **Download raw file**, then open the HTML. It is separate from the database-backed application and its subscription screens remain illustrative.

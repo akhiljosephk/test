@@ -5,4 +5,4 @@ After=docker.service
 Type=oneshot
 TimeoutStartSec=900
 WorkingDirectory=/opt/mapledesk
-ExecStart=/usr/bin/docker compose exec -T app node scripts/backup.js
+ExecStart=/usr/bin/docker compose exec -T app java -jar /app/app.jar --app.command=backup

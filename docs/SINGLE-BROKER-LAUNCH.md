@@ -22,7 +22,7 @@ These are implemented code paths, not a claim of real provider connectivity. Tes
 flowchart TB
     B[Broker browser] --> TLS[Caddy HTTPS]
     subgraph AWS Canada Central - one small EC2 instance
-      TLS --> APP[Node.js application and private owner workspace]
+      TLS --> APP[Spring Boot application and private owner workspace]
       APP --> DB[(SQLite on encrypted EBS volume)]
       APP --> JOB[Durable job processor and daily reminder checks]
       JOB --> DB
@@ -34,7 +34,7 @@ flowchart TB
     BK --> S3[Private S3 backup bucket]
 ```
 
-Keep the existing plain-JavaScript interface and Node.js backend rather than paying for a React/Next.js rewrite. SQLite is appropriate for this single-instance pilot; keep one process/replica. There is no RDS, Redis, paid AI, public signup, subscription checkout, or multi-business architecture in this release. When multiple businesses become a real requirement, plan PostgreSQL, business-scoped access, onboarding and billing as a separate migration. This is not currently tenant-isolated SaaS.
+Keep the existing browser interface and use Java 21 / Spring Boot for the backend so the developer can maintain the stack confidently. SQLite is appropriate for this single-instance pilot; keep one process/replica. There is no RDS, Redis, paid AI, public signup, subscription checkout, or multi-business architecture in this release. When multiple businesses become a real requirement, plan PostgreSQL, business-scoped access, onboarding and billing as a separate migration. This is not currently tenant-isolated SaaS.
 
 The earlier prototype remains at `/demo` and in `mockups/`. Its sample conversations and subscription screens do not enable those features in the real workspace.
 

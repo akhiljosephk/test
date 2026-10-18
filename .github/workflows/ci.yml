@@ -1,12 +1,18 @@
-name: Validate MapleDesk
+name: Validate MapleDesk Java
 on:
   push:
   pull_request:
 jobs:
-  app:
+  application:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: ./mvnw -B verify
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
@@ -15,7 +21,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run check
       - run: npm test
-      - run: docker build -t mapledesk:pilot .
+      - run: docker build -t mapledesk:java .
       - run: npm run test:container
   infrastructure:
     runs-on: ubuntu-latest

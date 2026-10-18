@@ -1,53 +1,230 @@
-const { chromium } = require('playwright');
-const {spawn}=require('node:child_process');
-const path=require('node:path');
-const fs=require('node:fs');
-const server=spawn(process.execPath,[path.join(__dirname,'..','server.js')],{env:{...process.env,PORT:'3100',DB_PATH:require('node:path').join(require('node:os').tmpdir(),'mapledesk-prototype-'+process.pid+'.sqlite'),MESSAGING_MODE:'mock'},stdio:'ignore'});
-process.on('exit',()=>server.kill());
-const assert = require('node:assert/strict');
-(async()=>{
-const browser=await chromium.launch({executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||(fs.existsSync('/usr/bin/chromium')?'/usr/bin/chromium':undefined),headless:true,args:['--no-sandbox']});
-const page=await browser.newPage({viewport:{width:1512,height:1100}});
-const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://127.0.0.1:3100/demo');
-await page.evaluate(()=>localStorage.clear());await page.reload();
-const nav=async p=>{await page.locator(`#nav [data-page="${p}"]`).click();};
-const action=async a=>{await page.locator(`[data-action="${a}"]`).first().click();};
-const data=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('mapledesk-demo-v1')));
+const { chromium } = require("playwright");
+const fs = require("node:fs");
+const { startJava } = require("./java-server.cjs");
+let server;
+process.on("exit", () => server?.child.kill());
+const assert = require("node:assert/strict");
+(async () => {
+  server = await startJava();
+  const browser = await chromium.launch({
+    executablePath:
+      process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ||
+      (fs.existsSync("/usr/bin/chromium") ? "/usr/bin/chromium" : undefined),
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage({
+    viewport: { width: 1512, height: 1100 },
+  });
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto(server.base + "/demo");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  const nav = async (p) => {
+    await page.locator(`#nav [data-page="${p}"]`).click();
+  };
+  const action = async (a) => {
+    await page.locator(`[data-action="${a}"]`).first().click();
+  };
+  const data = () =>
+    page.evaluate(() => JSON.parse(localStorage.getItem("mapledesk-demo-v1")));
 
-await action('draft-channel');
-await page.locator('[data-action="draft-channel"][data-channel="email"]').click();
-await page.locator('#follow-draft').fill('Hi Joseph, here are the monthly payment options for your parents. Happy to help!');
-await action('review-followup');await action('confirm-followup');
-let s=await data();assert.equal(s.leads[0].due,'2026-10-22');assert.equal(s.threads.find(t=>t.name==='Joseph Mathew'&&t.channel==='email').messages.at(-1).text,'Hi Joseph, here are the monthly payment options for your parents. Happy to help!');
-console.log('PASS personalized email follow-up and 2-day scheduling');
-await nav('leads');await action('add-lead');
-await page.locator('[name="name"]').fill('Test Client');await page.locator('[name="email"]').fill('test@example.com');await page.locator('[name="phone"]').fill('+1 416 555 0199');await page.locator('[name="channel"]').selectOption('email');await page.locator('[name="interval"]').selectOption('4');await page.locator('[name="notes"]').fill('Needs coverage for a November visit.');await page.locator('#lead-form button[type="submit"]').click();
-s=await data();let lead=s.leads.find(l=>l.name==='Test Client');assert.equal(lead.interval,4);
-await page.locator('#lead-search').fill('Test Client');assert.equal(await page.locator('tbody tr').count(),1);await page.locator('tbody tr').click();await action('schedule');await page.locator('[name="due"]').fill('2026-11-03');await page.locator('#schedule-form button').click();s=await data();assert.equal(s.leads.find(l=>l.id===lead.id).due,'2026-11-03');
-await page.locator('tbody tr').click();await action('mark-won');s=await data();assert.equal(s.leads.find(l=>l.id===lead.id).status,'Won');
-console.log('PASS lead creation, search, 4-day cadence, next-month scheduling and won status');
-await nav('inbox');await page.locator('[data-action="inbox-filter"][data-channel="whatsapp"]').click();await page.locator('[data-action="thread"][data-id="t1"]').click();await page.locator('#reply-form [name="message"]').fill('Hi Joseph, I’ll follow up with the monthly payment details.');await page.locator('#reply-form button').click();s=await data();assert.match(s.threads.find(t=>t.id==='t1').messages.at(-1).text,/monthly payment details/);
-console.log('PASS WhatsApp inbox reply');
-await action('simulate-incoming');await page.locator('[name="name"]').fill('Sophie Laurent');await page.locator('#incoming-form button.primary').click();s=await data();let r=s.requests.find(r=>r.name==='Sophie Laurent');assert.equal(r.ack,true);let t=s.threads.find(t=>t.name==='Sophie Laurent');assert.equal(t.channel,'email');assert.equal(t.messages.length,2);assert.match(t.messages[1].text,/policy has not been changed/);
-await page.locator('#reply-form [name="message"]').fill('Hi Sophie, we will review the address change with your insurer.');await page.locator('#reply-form button').click();
-console.log('PASS incoming email creates task, automatic acknowledgement, and supports reply');
-await nav('requests');await page.locator(`[data-action="request-detail"][data-id="${r.id}"]`).click();await page.locator('[name="status"]').selectOption('Completed');await page.locator('[name="note"]').fill('Reviewed with client in demo.');await page.locator('#request-form button[type="submit"]').click();s=await data();assert.equal(s.requests.find(x=>x.id===r.id).status,'Completed');
-console.log('PASS request completion and internal notes');
-await nav('policies');await page.locator('[data-action="policy-reminder"][data-id="p2"]').click();await page.locator('[name="channel"]').selectOption('email');await page.locator('#reminder-form button.primary').click();s=await data();assert.equal(s.policies.find(p=>p.id==='p2').reminded,true);assert.match(s.threads.find(t=>t.name==='Michael Wong').messages[0].text,/starts on Oct 27/);
-await page.locator('[data-action="policy-reminder"][data-id="p1"]').click();await page.locator('#reminder-form button.primary').click();s=await data();assert.equal(s.threads.find(t=>t.name==='Anita Patel').channel,'whatsapp');
-console.log('PASS effective/expiry reminders through email and WhatsApp');
-await page.locator('.sidebar [data-page="settings"]').click();await page.locator('[data-action="toggle-connection"][data-key="email"]').click();await nav('inbox');await page.locator('[data-action="inbox-filter"][data-channel="email"]').click();await page.locator('[data-action="thread"][data-id="t2"]').click();let before=(await data()).threads.find(t=>t.id==='t2').messages.length;await page.locator('#reply-form [name="message"]').fill('This must be blocked.');await page.locator('#reply-form button').click();assert.equal((await data()).threads.find(t=>t.id==='t2').messages.length,before);
-console.log('PASS disconnected email blocks sending');
-await page.locator('.sidebar [data-page="settings"]').click();await page.locator('[data-action="toggle-connection"][data-key="email"]').click();await page.locator('[data-setting="autoAck"]').uncheck();await nav('inbox');await action('simulate-incoming');await page.locator('[name="name"]').fill('No Ack Client');await page.locator('[name="channel"]').selectOption('whatsapp');await page.locator('#incoming-form button.primary').click();s=await data();assert.equal(s.requests.find(r=>r.name==='No Ack Client').ack,false);assert.equal(s.threads.find(t=>t.name==='No Ack Client').messages.length,1);
-console.log('PASS WhatsApp incoming request respects disabled acknowledgement');
-await page.locator('.sidebar [data-page="billing"]').click();await page.locator('[data-action="choose-plan"][data-plan="Team"]').click();await page.reload();s=await data();assert.equal(s.plan,'Team');assert.equal(await page.locator('.plan-label').textContent(),'✦ TEAM');
-console.log('PASS subscription selection and reload persistence');
-await page.locator('#reset').click();await action('reset-confirm');s=await data();assert.equal(s.leads.length,4);assert.equal(s.plan,'Professional');assert.equal(s.settings.autoAck,true);assert.equal(s.threads.length,4);
-console.log('PASS full demo reset');
-await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.locator('#mobile-menu').click();await nav('inbox');await page.locator('#mobile-menu').click();await page.locator('.sidebar [data-page="settings"]').click();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-console.log('PASS mobile navigation and no page overflow');
-await page.setViewportSize({width:1512,height:1100});await page.goto('http://127.0.0.1:3100/mockups/MapleDesk-Interactive.html');assert.equal(await page.locator('h1').textContent(),'A little clarity. A better day.');await page.locator('[data-page="inbox"]').first().click();assert.match(await page.locator('h1').textContent(),/One inbox/);
-console.log('PASS self-contained HTML export navigation (served over HTTP)');
-assert.deepEqual(errors,[]);console.log('PASS no browser JavaScript errors');await browser.close();server.kill();
-})().catch(e=>{console.error(e);process.exit(1);});
+  await action("draft-channel");
+  await page
+    .locator('[data-action="draft-channel"][data-channel="email"]')
+    .click();
+  await page
+    .locator("#follow-draft")
+    .fill(
+      "Hi Joseph, here are the monthly payment options for your parents. Happy to help!",
+    );
+  await action("review-followup");
+  await action("confirm-followup");
+  let s = await data();
+  assert.equal(s.leads[0].due, "2026-10-22");
+  assert.equal(
+    s.threads
+      .find((t) => t.name === "Joseph Mathew" && t.channel === "email")
+      .messages.at(-1).text,
+    "Hi Joseph, here are the monthly payment options for your parents. Happy to help!",
+  );
+  console.log("PASS personalized email follow-up and 2-day scheduling");
+  await nav("leads");
+  await action("add-lead");
+  await page.locator('[name="name"]').fill("Test Client");
+  await page.locator('[name="email"]').fill("test@example.com");
+  await page.locator('[name="phone"]').fill("+1 416 555 0199");
+  await page.locator('[name="channel"]').selectOption("email");
+  await page.locator('[name="interval"]').selectOption("4");
+  await page
+    .locator('[name="notes"]')
+    .fill("Needs coverage for a November visit.");
+  await page.locator('#lead-form button[type="submit"]').click();
+  s = await data();
+  let lead = s.leads.find((l) => l.name === "Test Client");
+  assert.equal(lead.interval, 4);
+  await page.locator("#lead-search").fill("Test Client");
+  assert.equal(await page.locator("tbody tr").count(), 1);
+  await page.locator("tbody tr").click();
+  await action("schedule");
+  await page.locator('[name="due"]').fill("2026-11-03");
+  await page.locator("#schedule-form button").click();
+  s = await data();
+  assert.equal(s.leads.find((l) => l.id === lead.id).due, "2026-11-03");
+  await page.locator("tbody tr").click();
+  await action("mark-won");
+  s = await data();
+  assert.equal(s.leads.find((l) => l.id === lead.id).status, "Won");
+  console.log(
+    "PASS lead creation, search, 4-day cadence, next-month scheduling and won status",
+  );
+  await nav("inbox");
+  await page
+    .locator('[data-action="inbox-filter"][data-channel="whatsapp"]')
+    .click();
+  await page.locator('[data-action="thread"][data-id="t1"]').click();
+  await page
+    .locator('#reply-form [name="message"]')
+    .fill("Hi Joseph, I’ll follow up with the monthly payment details.");
+  await page.locator("#reply-form button").click();
+  s = await data();
+  assert.match(
+    s.threads.find((t) => t.id === "t1").messages.at(-1).text,
+    /monthly payment details/,
+  );
+  console.log("PASS WhatsApp inbox reply");
+  await action("simulate-incoming");
+  await page.locator('[name="name"]').fill("Sophie Laurent");
+  await page.locator("#incoming-form button.primary").click();
+  s = await data();
+  let r = s.requests.find((r) => r.name === "Sophie Laurent");
+  assert.equal(r.ack, true);
+  let t = s.threads.find((t) => t.name === "Sophie Laurent");
+  assert.equal(t.channel, "email");
+  assert.equal(t.messages.length, 2);
+  assert.match(t.messages[1].text, /policy has not been changed/);
+  await page
+    .locator('#reply-form [name="message"]')
+    .fill("Hi Sophie, we will review the address change with your insurer.");
+  await page.locator("#reply-form button").click();
+  console.log(
+    "PASS incoming email creates task, automatic acknowledgement, and supports reply",
+  );
+  await nav("requests");
+  await page
+    .locator(`[data-action="request-detail"][data-id="${r.id}"]`)
+    .click();
+  await page.locator('[name="status"]').selectOption("Completed");
+  await page.locator('[name="note"]').fill("Reviewed with client in demo.");
+  await page.locator('#request-form button[type="submit"]').click();
+  s = await data();
+  assert.equal(s.requests.find((x) => x.id === r.id).status, "Completed");
+  console.log("PASS request completion and internal notes");
+  await nav("policies");
+  await page.locator('[data-action="policy-reminder"][data-id="p2"]').click();
+  await page.locator('[name="channel"]').selectOption("email");
+  await page.locator("#reminder-form button.primary").click();
+  s = await data();
+  assert.equal(s.policies.find((p) => p.id === "p2").reminded, true);
+  assert.match(
+    s.threads.find((t) => t.name === "Michael Wong").messages[0].text,
+    /starts on Oct 27/,
+  );
+  await page.locator('[data-action="policy-reminder"][data-id="p1"]').click();
+  await page.locator("#reminder-form button.primary").click();
+  s = await data();
+  assert.equal(
+    s.threads.find((t) => t.name === "Anita Patel").channel,
+    "whatsapp",
+  );
+  console.log("PASS effective/expiry reminders through email and WhatsApp");
+  await page.locator('.sidebar [data-page="settings"]').click();
+  await page
+    .locator('[data-action="toggle-connection"][data-key="email"]')
+    .click();
+  await nav("inbox");
+  await page
+    .locator('[data-action="inbox-filter"][data-channel="email"]')
+    .click();
+  await page.locator('[data-action="thread"][data-id="t2"]').click();
+  let before = (await data()).threads.find((t) => t.id === "t2").messages
+    .length;
+  await page
+    .locator('#reply-form [name="message"]')
+    .fill("This must be blocked.");
+  await page.locator("#reply-form button").click();
+  assert.equal(
+    (await data()).threads.find((t) => t.id === "t2").messages.length,
+    before,
+  );
+  console.log("PASS disconnected email blocks sending");
+  await page.locator('.sidebar [data-page="settings"]').click();
+  await page
+    .locator('[data-action="toggle-connection"][data-key="email"]')
+    .click();
+  await page.locator('[data-setting="autoAck"]').uncheck();
+  await nav("inbox");
+  await action("simulate-incoming");
+  await page.locator('[name="name"]').fill("No Ack Client");
+  await page.locator('[name="channel"]').selectOption("whatsapp");
+  await page.locator("#incoming-form button.primary").click();
+  s = await data();
+  assert.equal(s.requests.find((r) => r.name === "No Ack Client").ack, false);
+  assert.equal(
+    s.threads.find((t) => t.name === "No Ack Client").messages.length,
+    1,
+  );
+  console.log(
+    "PASS WhatsApp incoming request respects disabled acknowledgement",
+  );
+  await page.locator('.sidebar [data-page="billing"]').click();
+  await page.locator('[data-action="choose-plan"][data-plan="Team"]').click();
+  await page.reload();
+  s = await data();
+  assert.equal(s.plan, "Team");
+  assert.equal(await page.locator(".plan-label").textContent(), "✦ TEAM");
+  console.log("PASS subscription selection and reload persistence");
+  await page.locator("#reset").click();
+  await action("reset-confirm");
+  s = await data();
+  assert.equal(s.leads.length, 4);
+  assert.equal(s.plan, "Professional");
+  assert.equal(s.settings.autoAck, true);
+  assert.equal(s.threads.length, 4);
+  console.log("PASS full demo reset");
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+  await page.locator("#mobile-menu").click();
+  await nav("inbox");
+  await page.locator("#mobile-menu").click();
+  await page.locator('.sidebar [data-page="settings"]').click();
+  assert.equal(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > innerWidth,
+    ),
+    false,
+  );
+  console.log("PASS mobile navigation and no page overflow");
+  await page.setViewportSize({ width: 1512, height: 1100 });
+  await page.goto(server.base + "/mockups/MapleDesk-Interactive.html");
+  assert.equal(
+    await page.locator("h1").textContent(),
+    "A little clarity. A better day.",
+  );
+  await page.locator('[data-page="inbox"]').first().click();
+  assert.match(await page.locator("h1").textContent(), /One inbox/);
+  console.log("PASS self-contained HTML export navigation (served over HTTP)");
+  assert.deepEqual(errors, []);
+  console.log("PASS no browser JavaScript errors");
+  await browser.close();
+  await server.stop();
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

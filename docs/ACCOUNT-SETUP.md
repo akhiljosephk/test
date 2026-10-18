@@ -4,7 +4,7 @@ The application can be tested locally before creating AWS resources or buying a 
 
 ## 1. Local application
 
-Use Node.js 24 and the setup instructions in README.md. It creates an empty local database, owner login, and encryption key. Initially use mock delivery, simulate incoming requests, add a client, and import a small policy CSV. No AWS or Meta account is required for these tests.
+Use a Java 21 JDK and the Maven/owner-provisioning instructions in README.md. It creates an empty local database, owner login, and encryption key. Initially use mock delivery, simulate incoming requests, add a client, and import a small policy CSV. No AWS or Meta account is required for these tests.
 
 ## 2. Google Cloud project for Gmail
 

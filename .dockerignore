@@ -9,3 +9,5 @@ infra/*.tfstate*
 infra/*.tfvars
 playwright-report
 test-results
+
+target

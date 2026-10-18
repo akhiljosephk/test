@@ -1,37 +1,45 @@
 "use strict";
-const { execFileSync } = require("node:child_process");
-const assert = require("node:assert/strict");
-const tag = process.env.MAPLEDESK_IMAGE || "mapledesk:pilot";
+const { execFileSync } = require("node:child_process"),
+  crypto = require("node:crypto"),
+  assert = require("node:assert/strict");
+const image = process.env.MAPLEDESK_IMAGE || "mapledesk:java";
 const suffix = Date.now() + "-" + process.pid,
-  name = "mapledesk-test-" + suffix,
+  name = "mapledesk-java-test-" + suffix,
   volume = name + "-data";
 const docker = (args) =>
   execFileSync("docker", args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
-async function healthy() {
-  for (let n = 0; n < 40; n++) {
-    try {
-      docker([
-        "exec",
-        name,
-        "node",
-        "-e",
-        "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
-      ]);
-      return;
-    } catch {
-      await new Promise((r) => setTimeout(r, 250));
+function totp(secret) {
+  let buffer = 0,
+    bits = 0;
+  const bytes = [];
+  for (const c of secret) {
+    buffer = (buffer << 5) | "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(c);
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 255);
     }
   }
-  throw new Error("Container failed its readiness check");
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const hash = crypto
+      .createHmac("sha1", Buffer.from(bytes))
+      .update(counter)
+      .digest(),
+    offset = hash.at(-1) & 15;
+  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(
+    6,
+    "0",
+  );
 }
 (async () => {
   try {
     docker(["volume", "create", volume]);
     const env = [
-      "NODE_ENV=production",
+      "APP_ENV=production",
       "PUBLIC_URL=https://broker.example",
       "OWNER_EMAIL=owner@example.com",
       "OWNER_PASSWORD=test-only-container-password!",
@@ -53,35 +61,94 @@ async function healthy() {
       "ALL",
       "--security-opt",
       "no-new-privileges:true",
+      "-p",
+      "127.0.0.1::3000",
       "--mount",
       "type=volume,source=" + volume + ",target=/data",
-      ...env.flatMap((e) => ["-e", e]),
-      tag,
+      ...env.flatMap((v) => ["-e", v]),
+      image,
     ]);
+    const containerUrl = () =>
+      "http://" + docker(["port", name, "3000"]).trim().split("\n")[0];
+    let base = containerUrl();
+    async function healthy() {
+      for (let i = 0; i < 160; i++) {
+        try {
+          if (
+            (
+              await fetch(base + "/healthz", {
+                signal: AbortSignal.timeout(1500),
+              })
+            ).ok
+          )
+            return;
+        } catch {}
+        await new Promise((r) => setTimeout(r, 150));
+      }
+      throw new Error(
+        "Java container readiness failed: " +
+          docker(["logs", name]).split("\n").slice(-24).join("\n"),
+      );
+    }
     await healthy();
-    const result = docker([
+    docker([
       "exec",
       name,
-      "node",
-      "-e",
-      `(async()=>{const OTPAuth=require('otpauth');const code=new OTPAuth.TOTP({secret:OTPAuth.Secret.fromBase32(process.env.OWNER_TOTP_SECRET)}).generate();const headers={'Content-Type':'application/json',Origin:'https://broker.example'};const login=await fetch('http://127.0.0.1:3000/api/login',{method:'POST',headers,body:JSON.stringify({email:'owner@example.com',password:process.env.OWNER_PASSWORD,code})});if(!login.ok)throw new Error('Sign-in status '+login.status);const body=await login.json();headers.Cookie=login.headers.get('set-cookie').split(';')[0];headers['x-csrf-token']=body.csrf;const response=await fetch('http://127.0.0.1:3000/api/leads',{method:'POST',headers,body:JSON.stringify({contact:{name:'Container Test',email:'container@example.com',notes:''},insurance_type:'Super Visa',due:'2026-11-01',interval_days:2,channel:'email'})});if(response.status!==201)throw new Error('Create status '+response.status);console.log('created');})().catch(e=>{console.error(e.message);process.exit(1)})`,
+      "java",
+      "-Xmx32m",
+      "-cp",
+      "/app/health",
+      "com.mapledesk.HealthProbe",
     ]);
-    assert.equal(result.trim(), "created");
+    const headers = {
+      "Content-Type": "application/json",
+      Origin: "https://broker.example",
+    };
+    const login = await fetch(base + "/api/login", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        email: "owner@example.com",
+        password: "test-only-container-password!",
+        code: totp("JBSWY3DPEHPK3PXP"),
+      }),
+    });
+    assert.equal(login.status, 200);
+    const data = await login.json();
+    assert.match(login.headers.get("set-cookie"), /Secure/);
+    headers.Cookie = login.headers.get("set-cookie").split(";")[0];
+    headers["x-csrf-token"] = data.csrf;
+    const created = await fetch(base + "/api/leads", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        contact: {
+          name: "Container Test",
+          email: "container@example.com",
+          notes: "",
+        },
+        insurance_type: "Super Visa",
+        due: "2026-11-01",
+        interval_days: 2,
+        channel: "email",
+      }),
+    });
+    assert.equal(created.status, 201);
     console.log(
-      "PASS production-mode container: MFA sign-in and database-backed client creation",
+      "PASS Spring Boot production container: MFA sign-in and persisted client creation",
     );
     docker(["restart", name]);
+    base = containerUrl();
     await healthy();
-    const count = docker([
-      "exec",
-      name,
-      "node",
-      "-e",
-      "const db=new(require('better-sqlite3'))('/data/workspace.sqlite',{readonly:true});console.log(db.prepare('SELECT count(*) n FROM leads').get().n);db.close();",
-    ]);
-    assert.equal(count.trim(), "1");
+    const result = await fetch(base + "/api/state", { headers });
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).leads.length, 1);
+    assert.equal(
+      docker(["inspect", "--format", "{{.Config.User}}", name]).trim(),
+      "mapledesk",
+    );
     console.log(
-      "PASS read-only non-root container: persistent data survives restart",
+      "PASS Java non-root read-only container: records and session survive restart",
     );
   } finally {
     try {

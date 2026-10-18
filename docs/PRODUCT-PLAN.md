@@ -1,6 +1,6 @@
 # MapleDesk: workflows, architecture, stack, and budget
 
-> Historical multi-business proposal. The current client-first scope and lower-cost deployment are in [SINGLE-BROKER-LAUNCH.md](SINGLE-BROKER-LAUNCH.md).
+> Historical multi-business/JavaScript proposal. Java 21 / Spring Boot is now selected; see [JAVA-MIGRATION.md](JAVA-MIGRATION.md). The current client-first scope and lower-cost deployment are in [SINGLE-BROKER-LAUNCH.md](SINGLE-BROKER-LAUNCH.md).
 
 Planning proposal · October 17, 2026 · All estimates in Canadian dollars, before tax.
 

@@ -12,3 +12,6 @@ infra/.terraform/
 infra/*.tfstate*
 infra/*.tfplan
 infra/terraform.tfvars
+/target/
+*.iml
+.idea/

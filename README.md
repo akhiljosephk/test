@@ -1,50 +1,74 @@
-# MapleDesk · Single-broker workspace
+# MapleDesk · Java / Spring Boot
 
-A client-first insurance workspace for a broker using Gmail and WhatsApp Business. It keeps client names unchanged and organizes follow-ups, policies, conversations and change tasks in one place.
+A single-broker insurance workspace built with **Java 21, Spring Boot 3.5, Spring Security, Spring JDBC and SQLite**. The existing browser interface remains JavaScript; **Node.js is not required to build or run the application**. It is optional for Playwright browser tests and visual-mockup exports.
 
-**Status:** implemented and locally tested; no real accounts connected and no AWS resources deployed. Provider acceptance tests, phone-app coexistence validation and an AWS recovery rehearsal are still required before production use.
+**Status:** locally validated implementation; no real accounts connected or AWS resources deployed. Gmail/WhatsApp acceptance tests, phone-app coexistence verification, and an AWS backup/restore rehearsal are still launch gates.
 
-## Start here
+## Get started
 
-- [Current scope, architecture and estimated operating costs](docs/SINGLE-BROKER-LAUNCH.md)
-- [Account setup: test locally before buying cloud infrastructure](docs/ACCOUNT-SETUP.md)
-- [Development, deployment, backups and recovery](docs/DEPLOYMENT.md)
-- [Validation evidence and remaining launch gates](docs/VALIDATION.md)
-- [Original interactive visual prototype](mockups/MapleDesk-Interactive.html)
-
-## What it does
-
-- Private owner sign-in, secure server sessions, authenticator MFA in production, and login throttling.
-- Server-backed contacts, consent evidence, opt-outs, client notes, lead statuses, monthly filters and 2/4-day follow-up dates.
-- Gmail OAuth, recent inbox/sent synchronization, incremental polling, conversation replies and queued sending adapters.
-- Official WhatsApp API webhook verification, inbound messages/statuses, approved templates and service-window checks.
-- A **manual WhatsApp alternative**: open a draft in the existing phone app and explicitly confirm sending. It does not claim automatic delivery or synchronize app history.
-- Policy entry/updates, CSV preview/import, daily 30/7-day reminder drafts and broker approval.
-- Rule-detected client change requests, optional receipt-only acknowledgements, manual task creation and internal review notes.
-- Durable jobs, duplicate protection, stale-policy checks, audit activity, encrypted credential storage and encrypted backup/restore tooling.
-
-The pilot uses Node.js 24, Express and SQLite on one server. It has no subscription billing, AI fees, insurer portal automation or multi-business hosting. Scaling to other businesses needs a reviewed data/access migration.
-
-## Local setup
+Install a Java 21 **JDK**, then build using the checked-in Maven Wrapper:
 
 ```sh
-npm ci
-# Provision the owner with a password entered privately; see the runbook:
+./mvnw verify
+# On Windows: mvnw.cmd verify
+```
+
+Provision the owner with a privately entered password:
+
+```sh
 read -r -p 'Owner email: ' OWNER_EMAIL
 read -r -s -p 'Initial owner password (14+ characters): ' OWNER_PASSWORD
 export OWNER_EMAIL OWNER_PASSWORD
-npm run setup:local
+java -jar target/mapledesk-1.0.0.jar --app.command=init
 unset OWNER_EMAIL OWNER_PASSWORD
-npm start
+java -jar target/mapledesk-1.0.0.jar
 ```
 
-The workspace is at `/`; the original demo is at `/demo`. The setup command creates an empty database and a private `.env`; no default owner or sample clients are created. Messaging defaults to mock delivery. Keep `.env`, databases, backups and Terraform state out of Git.
+The initializer creates a private `.env` with an encryption key if none exists, provisions an owner if needed, and preserves existing files/owners. No sample clients or default password are created. You can alternatively run `./mvnw spring-boot:run` after provisioning. The private workspace is at `/`; the original visual demo remains at `/demo`.
+
+## Features
+
+- Private owner sign-in, server sessions, session-bound CSRF/origin checks, login throttling and production MFA.
+- Persistent clients, consent evidence, opt-outs, notes, lead statuses, monthly filters and 2/4-day follow-up dates.
+- Gmail OAuth with PKCE, encrypted tokens, incremental inbox/sent sync, conversation replies and queued sending.
+- Official WhatsApp webhook verification, inbound/status events, service-window enforcement and approved templates.
+- Manual WhatsApp phone-app handoff with explicit owner confirmation, separate from verified delivery.
+- Policy entry/updates, CSV preview/import, and reviewed 30/7-day reminder drafts.
+- Receipt-only acknowledgements, rule-detected change requests, manual tasks, audit events and durable jobs.
+- Java backup/restore commands, Docker/Caddy HTTPS deployment, Terraform and CI.
+
+## Code organization
+
+| Component | Responsibility |
+|---|---|
+| `ApiController` | HTTP contract used by the interface |
+| `DomainService` and `Input` records | Clients, leads, policies, imports and requests |
+| `Database` | Spring JDBC, transactions and SQLite schema compatibility |
+| `AuthService`, `SecurityConfig`, `Crypto` | Authentication, MFA, request protections and encryption |
+| `JobService` | Persistent scheduling, retries and send safeguards |
+| `IntegrationService`, `ProviderTransport` | Gmail and official WhatsApp adapters |
+| `Cli` | Owner provisioning/reset, encrypted backup and restore |
+| `src/main/resources/static` | Existing browser application and original demo |
+
+## Validation
+
+`./mvnw verify` runs Java integration/security tests and packages the application. Browser checks are separate and optional:
 
 ```sh
+npm ci
+npx playwright install chromium  # or use existing Chromium
 npm run check
-npm test
+npm test                        # starts the packaged Java application
 ```
 
-Browser tests need Chromium: `npx playwright install chromium`, or set PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH to an existing binary. Tests use temporary databases and synthetic provider responses. For container checks, build `mapledesk:pilot` and run `npm run test:container`. No tests require real client accounts.
+For container checks: `docker build -t mapledesk:java .`, then `npm run test:container`. Browser tools contain no production backend dependencies. `npm run export` refreshes the self-contained original mockup.
 
-The self-contained visual mockup in `mockups/` still works offline: use GitHub's **Download raw file**, then open the HTML. It is separate from the database-backed application and its subscription screens remain illustrative.
+## Guides
+
+- [Java migration and existing-data compatibility](docs/JAVA-MIGRATION.md)
+- [Current single-broker scope, architecture and costs](docs/SINGLE-BROKER-LAUNCH.md)
+- [Account setup before cloud spending](docs/ACCOUNT-SETUP.md)
+- [Deployment, backups and recovery](docs/DEPLOYMENT.md)
+- [Validation evidence and launch gates](docs/VALIDATION.md)
+
+Keep `.env`, databases, backups and Terraform state private. This pilot is not multi-business SaaS and does not include insurer portal automation, paid AI or subscription billing.

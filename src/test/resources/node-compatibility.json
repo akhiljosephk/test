@@ -1,0 +1,10 @@
+{
+  "password": "legacy-test-only-password!",
+  "hash": "0123456789abcdef0123456789abcdef:3c202bc927e40277c782d7bcada2fa08828d95d51c9740f63336823f9d576676309934b830177bc9676cdbdf02ede88a63a0e4fa06072f076ef34eec175515ab",
+  "key": "abababababababababababababababababababababababababababababababab",
+  "payload": {
+    "refresh_token": "test-only-refresh-token",
+    "expires_at": 1800000000000
+  },
+  "encrypted": "070707070707070707070707:3597ff285db020e354a8173260df8a34:d686af116a35848622b9a3849e594b18bace59c3ea99d8ebf438a2eb06e75453aad51838d4d89840d141892d3ecb0f69e3f126bfd2831415a1e8b9ffded9ee1111b78dac13b4"
+}
